@@ -1,6 +1,3 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
 import tempfile
 import streamlit as st
@@ -14,6 +11,28 @@ from langchain_chroma import Chroma
 st.set_page_config(page_title="PDF Chatbot")
 st.title("📚 Chat With Your PDF")
 
+# -----------------------
+# Cached Resources
+# -----------------------
+
+@st.cache_resource
+def get_embeddings():
+    return HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
+
+@st.cache_resource
+def get_llm():
+    return ChatGroq(
+        model="llama-3.3-70b-versatile",
+        api_key=st.secrets["GROQ_API_KEY"],
+        temperature=0
+    )
+
+# -----------------------
+# Session State
+# -----------------------
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -22,6 +41,10 @@ if "db" not in st.session_state:
 
 if "current_pdf" not in st.session_state:
     st.session_state.current_pdf = None
+
+# -----------------------
+# PDF Upload
+# -----------------------
 
 uploaded_file = st.sidebar.file_uploader(
     "Upload PDF",
@@ -32,54 +55,85 @@ if uploaded_file:
 
     if st.session_state.current_pdf != uploaded_file.name:
 
-        with st.spinner("Processing PDF..."):
+        progress = st.progress(0)
 
-            with tempfile.NamedTemporaryFile(
-                delete=False,
-                suffix=".pdf"
-            ) as tmp_file:
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".pdf"
+        ) as tmp_file:
 
-                tmp_file.write(
-                    uploaded_file.getbuffer()
-                )
-
-                pdf_path = tmp_file.name
-
-            loader = PyPDFLoader(pdf_path)
-            docs = loader.load()
-
-            splitter = RecursiveCharacterTextSplitter(
-                chunk_size=2000,
-                chunk_overlap=100
+            tmp_file.write(
+                uploaded_file.getbuffer()
             )
 
-            chunks = splitter.split_documents(docs)
+            pdf_path = tmp_file.name
 
-            embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2"
-            )
+        progress.progress(20)
 
-            st.session_state.db = Chroma.from_documents(
-                documents=chunks,
-                embedding=embeddings
-            )
+        loader = PyPDFLoader(pdf_path)
+        docs = loader.load()
 
-            os.remove(pdf_path)
+        progress.progress(40)
 
-            st.session_state.current_pdf = uploaded_file.name
-            st.session_state.messages = []
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=3000,
+            chunk_overlap=100
+        )
 
-        st.sidebar.success("PDF Ready For Chat")
+        chunks = splitter.split_documents(docs)
 
-llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    temperature=0
-)
+        st.sidebar.write(
+            f"📄 Pages: {len(docs)}"
+        )
+
+        st.sidebar.write(
+            f"🧩 Chunks: {len(chunks)}"
+        )
+
+        progress.progress(60)
+
+        embeddings = get_embeddings()
+
+        progress.progress(80)
+
+        st.session_state.db = Chroma.from_documents(
+            documents=chunks,
+            embedding=embeddings
+        )
+
+        progress.progress(100)
+
+        os.remove(pdf_path)
+
+        st.session_state.current_pdf = uploaded_file.name
+        st.session_state.messages = []
+
+        st.sidebar.success(
+            "✅ PDF Ready For Chat"
+        )
+
+# -----------------------
+# LLM
+# -----------------------
+
+llm = get_llm()
+
+# -----------------------
+# Display Chat History
+# -----------------------
 
 for message in st.session_state.messages:
 
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    with st.chat_message(
+        message["role"]
+    ):
+        st.markdown(
+            message["content"]
+        )
+
+# -----------------------
+# User Input
+# -----------------------
 
 question = st.chat_input(
     "Ask anything from the PDF..."
@@ -105,17 +159,26 @@ if question:
         }
     )
 
-    retriever = st.session_state.db.as_retriever(
-        search_type="mmr",
-        search_kwargs={"k": 8}
+    retriever = (
+        st.session_state.db
+        .as_retriever(
+            search_type="mmr",
+            search_kwargs={"k": 8}
+        )
     )
 
-    docs = retriever.invoke(question)
+    docs = retriever.invoke(
+        question
+    )
 
     context = ""
 
     for doc in docs:
-        context += doc.page_content + "\n\n"
+
+        context += (
+            doc.page_content
+            + "\n\n"
+        )
 
     history = ""
 
@@ -139,18 +202,39 @@ Current Question:
 {question}
 
 Rules:
-1. Use previous conversation for follow-up questions.
-2. Use PDF context whenever possible.
-3. If asked for summary, overview, key points, or important topics, generate them from the context.
-4. If the answer is unavailable in the PDF context, say:
-'I could not find that information in the PDF.'
+
+1. Use previous conversation
+   for follow-up questions.
+
+2. Use PDF context
+   whenever possible.
+
+3. If asked for:
+   - summary
+   - overview
+   - important points
+   - key topics
+
+   generate them from
+   the context.
+
+4. If answer is not
+   available in the PDF,
+   say:
+
+   "I could not find that
+   information in the PDF."
 """
 
-    response = llm.invoke(prompt)
+    response = llm.invoke(
+        prompt
+    )
 
     answer = response.content
 
-    with st.chat_message("assistant"):
+    with st.chat_message(
+        "assistant"
+    ):
         st.markdown(answer)
 
     st.session_state.messages.append(
@@ -160,7 +244,13 @@ Rules:
         }
     )
 
-if st.sidebar.button("Clear Chat"):
+# -----------------------
+# Sidebar
+# -----------------------
+
+if st.sidebar.button(
+    "Clear Chat"
+):
 
     st.session_state.messages = []
     st.rerun()

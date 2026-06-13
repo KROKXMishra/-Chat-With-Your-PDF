@@ -8,4 +8,3 @@ langchain-huggingface
 sentence-transformers
 chromadb
 pypdf
-python-dotenv
