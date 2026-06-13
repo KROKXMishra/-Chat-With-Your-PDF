@@ -19,8 +19,5 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Chroma Database (if using persistent Chroma)
-vectorstore/
-
 # Temporary Files
 temp/

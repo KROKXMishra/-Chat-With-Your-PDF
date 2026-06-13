@@ -1,28 +1,29 @@
-# 📚 PDF Chatbot using RAG
+# 📚 Chat With Your PDF
 
-A Retrieval-Augmented Generation (RAG) based chatbot that allows users to upload PDF documents and interact with them using natural language. The application extracts text from uploaded PDFs, generates embeddings using OpenAI, stores them in ChromaDB, and retrieves relevant context to answer user queries accurately.
+A Retrieval-Augmented Generation (RAG) based PDF chatbot that allows users to upload PDF documents and interact with them using natural language. The application extracts text from uploaded PDFs, creates vector embeddings using Hugging Face models, stores them in ChromaDB, and uses Groq-powered LLMs to generate accurate and context-aware responses.
 
 ## 🚀 Features
 
-- Upload PDF files directly from the web interface
-- ChatGPT-style conversational UI
-- Context-aware question answering
-- Conversational memory for follow-up questions
-- Semantic search using vector embeddings
-- ChromaDB vector database integration
-- OpenAI GPT-4o-mini powered responses
-- Automatic PDF processing and indexing
+* Upload PDF files directly from the web interface
+* ChatGPT-style conversational UI
+* Ask questions about uploaded PDFs
+* Conversational memory for follow-up questions
+* Semantic search using vector embeddings
+* ChromaDB vector database
+* Groq Llama 3.3 70B integration
+* Completely free LLM and embedding stack
+* Automatic PDF processing and indexing
 
 ## 🛠️ Tech Stack
 
-- Python
-- LangChain
-- OpenAI GPT-4o-mini
-- OpenAI Embeddings
-- ChromaDB
-- Streamlit
-- PyPDF
-- RAG (Retrieval-Augmented Generation)
+* Python
+* Streamlit
+* LangChain
+* Groq (Llama 3.3 70B)
+* Hugging Face Embeddings
+* ChromaDB
+* PyPDF
+* RAG (Retrieval-Augmented Generation)
 
 ## 📂 Project Structure
 
@@ -31,8 +32,9 @@ pdf-rag-chatbot/
 │
 ├── app.py
 ├── requirements.txt
-├── .env
-└── README.md
+├── README.md
+├── .gitignore
+└── .env
 ```
 
 ## ⚙️ Installation
@@ -58,7 +60,7 @@ Windows:
 .venv\Scripts\activate
 ```
 
-Linux / Mac:
+Linux/Mac:
 
 ```bash
 source .venv/bin/activate
@@ -72,10 +74,10 @@ pip install -r requirements.txt
 
 ## 🔑 Environment Variables
 
-Create a `.env` file:
+Create a `.env` file in the project root:
 
 ```env
-OPENAI_API_KEY=your_openai_api_key
+GROQ_API_KEY=your_groq_api_key
 ```
 
 ## ▶️ Run the Application
@@ -93,30 +95,35 @@ Text Extraction
     ↓
 Chunking
     ↓
-OpenAI Embeddings
+Hugging Face Embeddings
     ↓
 ChromaDB
     ↓
 Context Retrieval
     ↓
-GPT-4o-mini
+Groq Llama 3.3 70B
     ↓
 Answer Generation
 ```
 
 ## 🎯 Use Cases
 
-- Chat with books and notes
-- Ask questions about research papers
-- Summarize large PDF documents
-- Extract key insights
-- Interactive learning and revision
+* Chat with books and notes
+* Analyze research papers
+* Summarize large PDF documents
+* Extract important points
+* Interactive learning and revision
 
-## 📸 Demo
+## 🌟 Highlights
 
-Upload any PDF and start asking questions in natural language through the chat interface.
+* No OpenAI API required
+* Fully free AI stack
+* Supports large PDF documents
+* Fast inference with Groq
+* Easy deployment using Streamlit Cloud
 
 ## 👨‍💻 Author
 
-Kallol
-NIT Durgapur | CSE
+Kallol Mishra
+
+CSE Student, NIT Durgapur
