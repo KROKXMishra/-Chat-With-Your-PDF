@@ -1,5 +1,6 @@
 import os
 import tempfile
+import hashlib
 import streamlit as st
 
 from langchain_groq import ChatGroq
@@ -11,10 +12,6 @@ from langchain_chroma import Chroma
 st.set_page_config(page_title="PDF Chatbot")
 st.title("📚 Chat With Your PDF")
 
-# -----------------------
-# Cached Resources
-# -----------------------
-
 @st.cache_resource
 def get_embeddings():
     return HuggingFaceEmbeddings(
@@ -23,15 +20,16 @@ def get_embeddings():
 
 @st.cache_resource
 def get_llm():
+    if "GROQ_API_KEY" in st.secrets:
+        api_key = st.secrets["GROQ_API_KEY"]
+    else:
+        api_key = os.getenv("GROQ_API_KEY")
+
     return ChatGroq(
         model="llama-3.3-70b-versatile",
-        api_key=st.secrets["GROQ_API_KEY"],
+        api_key=api_key,
         temperature=0
     )
-
-# -----------------------
-# Session State
-# -----------------------
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -39,12 +37,8 @@ if "messages" not in st.session_state:
 if "db" not in st.session_state:
     st.session_state.db = None
 
-if "current_pdf" not in st.session_state:
-    st.session_state.current_pdf = None
-
-# -----------------------
-# PDF Upload
-# -----------------------
+if "pdf_hash" not in st.session_state:
+    st.session_state.pdf_hash = None
 
 uploaded_file = st.sidebar.file_uploader(
     "Upload PDF",
@@ -53,7 +47,15 @@ uploaded_file = st.sidebar.file_uploader(
 
 if uploaded_file:
 
-    if st.session_state.current_pdf != uploaded_file.name:
+    current_hash = hashlib.md5(
+        uploaded_file.getvalue()
+    ).hexdigest()
+
+    if current_hash != st.session_state.pdf_hash:
+
+        st.session_state.db = None
+        st.session_state.messages = []
+        st.session_state.pdf_hash = current_hash
 
         progress = st.progress(0)
 
@@ -105,22 +107,11 @@ if uploaded_file:
 
         os.remove(pdf_path)
 
-        st.session_state.current_pdf = uploaded_file.name
-        st.session_state.messages = []
-
         st.sidebar.success(
             "✅ PDF Ready For Chat"
         )
 
-# -----------------------
-# LLM
-# -----------------------
-
 llm = get_llm()
-
-# -----------------------
-# Display Chat History
-# -----------------------
 
 for message in st.session_state.messages:
 
@@ -130,10 +121,6 @@ for message in st.session_state.messages:
         st.markdown(
             message["content"]
         )
-
-# -----------------------
-# User Input
-# -----------------------
 
 question = st.chat_input(
     "Ask anything from the PDF..."
@@ -167,9 +154,7 @@ if question:
         )
     )
 
-    docs = retriever.invoke(
-        question
-    )
+    docs = retriever.invoke(question)
 
     context = ""
 
@@ -202,39 +187,18 @@ Current Question:
 {question}
 
 Rules:
-
-1. Use previous conversation
-   for follow-up questions.
-
-2. Use PDF context
-   whenever possible.
-
-3. If asked for:
-   - summary
-   - overview
-   - important points
-   - key topics
-
-   generate them from
-   the context.
-
-4. If answer is not
-   available in the PDF,
-   say:
-
-   "I could not find that
-   information in the PDF."
+1. Use previous conversation for follow-up questions.
+2. Use PDF context whenever possible.
+3. If asked for summary, overview, important points, or key topics, generate them from the PDF context.
+4. If the answer is not available in the PDF context, say:
+'I could not find that information in the PDF.'
 """
 
-    response = llm.invoke(
-        prompt
-    )
+    response = llm.invoke(prompt)
 
     answer = response.content
 
-    with st.chat_message(
-        "assistant"
-    ):
+    with st.chat_message("assistant"):
         st.markdown(answer)
 
     st.session_state.messages.append(
@@ -244,13 +208,10 @@ Rules:
         }
     )
 
-# -----------------------
-# Sidebar
-# -----------------------
-
-if st.sidebar.button(
-    "Clear Chat"
-):
+if st.sidebar.button("Clear Chat"):
 
     st.session_state.messages = []
+    st.session_state.db = None
+    st.session_state.pdf_hash = None
+
     st.rerun()
