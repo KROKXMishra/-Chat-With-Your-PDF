@@ -3,11 +3,15 @@ import tempfile
 import hashlib
 import streamlit as st
 
+from dotenv import load_dotenv
+
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
+from langchain_community.vectorstores import FAISS
+
+load_dotenv()
 
 st.set_page_config(page_title="PDF Chatbot")
 st.title("📚 Chat With Your PDF")
@@ -20,9 +24,12 @@ def get_embeddings():
 
 @st.cache_resource
 def get_llm():
-    if "GROQ_API_KEY" in st.secrets:
+
+    api_key = None
+
+    try:
         api_key = st.secrets["GROQ_API_KEY"]
-    else:
+    except:
         api_key = os.getenv("GROQ_API_KEY")
 
     return ChatGroq(
@@ -75,6 +82,11 @@ if uploaded_file:
         loader = PyPDFLoader(pdf_path)
         docs = loader.load()
 
+        st.sidebar.write("Preview:")
+        st.sidebar.write(
+            docs[0].page_content[:300]
+        )
+
         progress.progress(40)
 
         splitter = RecursiveCharacterTextSplitter(
@@ -82,7 +94,9 @@ if uploaded_file:
             chunk_overlap=100
         )
 
-        chunks = splitter.split_documents(docs)
+        chunks = splitter.split_documents(
+            docs
+        )
 
         st.sidebar.write(
             f"📄 Pages: {len(docs)}"
@@ -98,9 +112,9 @@ if uploaded_file:
 
         progress.progress(80)
 
-        st.session_state.db = Chroma.from_documents(
-            documents=chunks,
-            embedding=embeddings
+        st.session_state.db = FAISS.from_documents(
+            chunks,
+            embeddings
         )
 
         progress.progress(100)
@@ -146,15 +160,10 @@ if question:
         }
     )
 
-    retriever = (
-        st.session_state.db
-        .as_retriever(
-            search_type="mmr",
-            search_kwargs={"k": 8}
-        )
+    docs = st.session_state.db.similarity_search(
+        question,
+        k=8
     )
-
-    docs = retriever.invoke(question)
 
     context = ""
 
@@ -189,16 +198,20 @@ Current Question:
 Rules:
 1. Use previous conversation for follow-up questions.
 2. Use PDF context whenever possible.
-3. If asked for summary, overview, important points, or key topics, generate them from the PDF context.
-4. If the answer is not available in the PDF context, say:
+3. If asked for summary, overview, key points or important topics, generate them from the PDF.
+4. If answer is unavailable in the PDF, say:
 'I could not find that information in the PDF.'
 """
 
-    response = llm.invoke(prompt)
+    response = llm.invoke(
+        prompt
+    )
 
     answer = response.content
 
-    with st.chat_message("assistant"):
+    with st.chat_message(
+        "assistant"
+    ):
         st.markdown(answer)
 
     st.session_state.messages.append(
@@ -208,7 +221,9 @@ Rules:
         }
     )
 
-if st.sidebar.button("Clear Chat"):
+if st.sidebar.button(
+    "Clear Chat"
+):
 
     st.session_state.messages = []
     st.session_state.db = None
