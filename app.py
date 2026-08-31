@@ -33,7 +33,7 @@ def get_llm():
         api_key = os.getenv("GROQ_API_KEY")
 
     return ChatGroq(
-        model="llama-3.3-70b-versatile",
+        model_name="openai/gpt-oss-20b",
         api_key=api_key,
         temperature=0
     )
