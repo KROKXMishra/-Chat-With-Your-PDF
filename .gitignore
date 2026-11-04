@@ -1,23 +1,28 @@
-# Virtual Environment
+# Environment variables
+.env
+
+# Virtual environments
 .venv/
 venv/
 
-# Environment Variables
-.env
-
-# Python Cache
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 
-# VS Code
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded PDFs
+uploads/
+
+# FAISS vector stores
+vectorstores/
+
+# IDE files
 .vscode/
 
-# Streamlit Secrets
-.streamlit/secrets.toml
-
-# OS Files
+# OS files
 .DS_Store
 Thumbs.db
-
-# Temporary Files
-temp/

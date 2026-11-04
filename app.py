@@ -1,232 +1,92 @@
-import os
-import tempfile
-import hashlib
-import streamlit as st
-
 from dotenv import load_dotenv
 
-from langchain_groq import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-
+# Load environment variables before application modules
 load_dotenv()
 
-st.set_page_config(page_title="PDF Chatbot")
-st.title("📚 Chat With Your PDF")
+import streamlit as st
 
-@st.cache_resource
-def get_embeddings():
-    return HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
+from database.connection import init_db
+from modules.authentication import show_authentication
+from modules.profile import show_profile
+from modules.pdf_manager import show_pdf_manager
+from modules.chat_history import show_chat_history
+from modules.chat import show_chat
 
-@st.cache_resource
-def get_llm():
 
-    api_key = None
-
-    try:
-        api_key = st.secrets["GROQ_API_KEY"]
-    except:
-        api_key = os.getenv("GROQ_API_KEY")
-
-    return ChatGroq(
-        model_name="openai/gpt-oss-20b",
-        api_key=api_key,
-        temperature=0
-    )
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "db" not in st.session_state:
-    st.session_state.db = None
-
-if "pdf_hash" not in st.session_state:
-    st.session_state.pdf_hash = None
-
-uploaded_file = st.sidebar.file_uploader(
-    "Upload PDF",
-    type=["pdf"]
+# Configure Streamlit page
+st.set_page_config(
+    page_title="PDF Reader AI",
+    page_icon="📚",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-if uploaded_file:
 
-    current_hash = hashlib.md5(
-        uploaded_file.getvalue()
-    ).hexdigest()
+# Initialize session state
+def initialize_session_state():
 
-    if current_hash != st.session_state.pdf_hash:
+    defaults = {
+        "user": None,
+        "messages": [],
+        "db": None,
+        "pdf_hash": None,
+        "pdf_docs": [],
+        "pdf_chunks": [],
+        "active_chat_id": None,
+        "active_pdf_name": None,
+        "selected_chat_id": 0,
+        "upload_key": 0,
+        "confirm_delete_all": False,
+        "delete_chat_id": None
+    }
 
-        st.session_state.db = None
-        st.session_state.messages = []
-        st.session_state.pdf_hash = current_hash
+    for key, value in defaults.items():
 
-        progress = st.progress(0)
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-        with tempfile.NamedTemporaryFile(
-            delete=False,
-            suffix=".pdf"
-        ) as tmp_file:
 
-            tmp_file.write(
-                uploaded_file.getbuffer()
-            )
+# Main application
+def main():
 
-            pdf_path = tmp_file.name
+    # Initialize database
+    init_db()
 
-        progress.progress(20)
+    # Initialize session state
+    initialize_session_state()
 
-        loader = PyPDFLoader(pdf_path)
-        docs = loader.load()
+    # Show login and registration
+    if st.session_state.user is None:
 
-        st.sidebar.write("Preview:")
-        st.sidebar.write(
-            docs[0].page_content[:300]
-        )
+        show_authentication()
 
-        progress.progress(40)
+        return
 
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=3000,
-            chunk_overlap=100
-        )
+    # Main application interface
+    st.title("📚 PDF Reader AI")
 
-        chunks = splitter.split_documents(
-            docs
-        )
-
-        st.sidebar.write(
-            f"📄 Pages: {len(docs)}"
-        )
-
-        st.sidebar.write(
-            f"🧩 Chunks: {len(chunks)}"
-        )
-
-        progress.progress(60)
-
-        embeddings = get_embeddings()
-
-        progress.progress(80)
-
-        st.session_state.db = FAISS.from_documents(
-            chunks,
-            embeddings
-        )
-
-        progress.progress(100)
-
-        os.remove(pdf_path)
-
-        st.sidebar.success(
-            "✅ PDF Ready For Chat"
-        )
-
-llm = get_llm()
-
-for message in st.session_state.messages:
-
-    with st.chat_message(
-        message["role"]
-    ):
-        st.markdown(
-            message["content"]
-        )
-
-question = st.chat_input(
-    "Ask anything from the PDF..."
-)
-
-if question:
-
-    if st.session_state.db is None:
-
-        st.warning(
-            "Please upload a PDF first."
-        )
-
-        st.stop()
-
-    with st.chat_message("user"):
-        st.markdown(question)
-
-    st.session_state.messages.append(
-        {
-            "role": "user",
-            "content": question
-        }
+    st.caption(
+        "Upload your PDF, ask questions, and manage your conversations."
     )
 
-    docs = st.session_state.db.similarity_search(
-        question,
-        k=8
-    )
+    # Sidebar
+    with st.sidebar:
 
-    context = ""
+        st.title("👤 Account")
 
-    for doc in docs:
+        show_profile()
 
-        context += (
-            doc.page_content
-            + "\n\n"
-        )
+        st.divider()
 
-    history = ""
+        show_chat_history()
 
-    for msg in st.session_state.messages[-6:]:
+    # Main content
+    show_pdf_manager()
 
-        history += (
-            f"{msg['role']}: "
-            f"{msg['content']}\n"
-        )
+    st.divider()
 
-    prompt = f"""
-You are a helpful PDF assistant.
+    show_chat()
 
-Previous Conversation:
-{history}
 
-PDF Context:
-{context}
-
-Current Question:
-{question}
-
-Rules:
-1. Use previous conversation for follow-up questions.
-2. Use PDF context whenever possible.
-3. If asked for summary, overview, key points or important topics, generate them from the PDF.
-4. If answer is unavailable in the PDF, say:
-'I could not find that information in the PDF.'
-"""
-
-    response = llm.invoke(
-        prompt
-    )
-
-    answer = response.content
-
-    with st.chat_message(
-        "assistant"
-    ):
-        st.markdown(answer)
-
-    st.session_state.messages.append(
-        {
-            "role": "assistant",
-            "content": answer
-        }
-    )
-
-if st.sidebar.button(
-    "Clear Chat"
-):
-
-    st.session_state.messages = []
-    st.session_state.db = None
-    st.session_state.pdf_hash = None
-
-    st.rerun()
+if __name__ == "__main__":
+    main()
