@@ -21,46 +21,25 @@ from reportlab.platypus import (
     HRFlowable,
     Preformatted
 )
-
+import matplotlib
 
 # =========================
 # FONT CONFIGURATION
 # =========================
 
 def register_pdf_fonts():
-
-    base_dir = Path(__file__).resolve().parent.parent
-
-    # Prefer DejaVu Sans for broader Unicode coverage
     font_dir = (
-        base_dir
-        / ".venv"
-        / "Lib"
-        / "site-packages"
-        / "matplotlib"
-        / "mpl-data"
+        Path(matplotlib.get_data_path())
         / "fonts"
         / "ttf"
     )
 
-    if not (font_dir / "DejaVuSans.ttf").exists():
-        font_dir = Path("C:/Windows/Fonts")
-
-        font_files = {
-            "Regular": "arial.ttf",
-            "Bold": "arialbd.ttf",
-            "Italic": "ariali.ttf",
-            "BoldItalic": "arialbi.ttf"
-        }
-
-    else:
-
-        font_files = {
-            "Regular": "DejaVuSans.ttf",
-            "Bold": "DejaVuSans-Bold.ttf",
-            "Italic": "DejaVuSans-Oblique.ttf",
-            "BoldItalic": "DejaVuSans-BoldOblique.ttf"
-        }
+    font_files = {
+        "Regular": "DejaVuSans.ttf",
+        "Bold": "DejaVuSans-Bold.ttf",
+        "Italic": "DejaVuSans-Oblique.ttf",
+        "BoldItalic": "DejaVuSans-BoldOblique.ttf"
+    }
 
     font_names = {
         "Regular": "PDFUnicode",
@@ -70,23 +49,17 @@ def register_pdf_fonts():
     }
 
     for style, filename in font_files.items():
-
         font_path = font_dir / filename
         font_name = font_names[style]
 
         if not font_path.exists():
             raise FileNotFoundError(
-                f"PDF font not found: {font_path}. "
-                "Install matplotlib or check your Windows Arial fonts."
+                f"PDF font not found: {font_path}"
             )
 
         if font_name not in pdfmetrics.getRegisteredFontNames():
-
             pdfmetrics.registerFont(
-                TTFont(
-                    font_name,
-                    str(font_path)
-                )
+                TTFont(font_name, str(font_path))
             )
 
     pdfmetrics.registerFontFamily(
