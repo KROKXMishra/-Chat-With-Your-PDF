@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 
 from database.connection import get_connection
 
-
 # Generate current UTC timestamp
 def current_time():
 

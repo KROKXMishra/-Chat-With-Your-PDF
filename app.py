@@ -15,7 +15,7 @@ from modules.chat import show_chat
 
 # Configure Streamlit page
 st.set_page_config(
-    page_title="PDF Reader AI",
+    page_title="Chat with PDF",
     page_icon="📚",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -63,7 +63,7 @@ def main():
         return
 
     # Main application interface
-    st.title("📚 PDF Reader AI")
+    st.title("📚 Chat with PDF")
 
     st.caption(
         "Upload your PDF, ask questions, and manage your conversations."
