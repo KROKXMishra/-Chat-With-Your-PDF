@@ -152,7 +152,7 @@ def show_register():
 # Main authentication interface
 def show_authentication():
 
-    st.title("📚 PDF Reader AI")
+    st.title("📚 Chat with PDF")
 
     st.write(
         "Upload your PDF documents and interact with them using AI."
